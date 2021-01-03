@@ -1,0 +1,16 @@
+/decoded
+/encoded
+/ffmpeg
+/idle
+/samplecpu
+/csv
+/ssim
+/psnr
+
+/input/*
+/old
+
+intelgadget
+.vscode
+.DS_Store
+opsnr.stt
