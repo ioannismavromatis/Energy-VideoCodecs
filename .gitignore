@@ -8,9 +8,9 @@
 /psnr
 
 /input/*
-/old
 
 intelgadget
 .vscode
 .DS_Store
+*.asv
 opsnr.stt

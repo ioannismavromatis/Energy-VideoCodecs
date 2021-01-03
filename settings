@@ -1,0 +1,18 @@
+preset="veryslow" # FFMPEG setting for H264 and H265 codecs
+RUN_ITERATIONS=3 # number of times to execute for all the different codecs, videos, and CRFs
+deleteFiles="false" # by default the existing files will not be removed
+
+runIdleTest="false"  # true or false - enable or disable the initial idle test experimentation
+IDLE_ITERATIONS=10 # number of times that the idle power sampling will be executed
+IDLE_TEST_LENGTH=60 # the idle power test lenth - in seconds
+
+enableFFMPEG="false" # true or false - enable or disable the encode and decode with FFMPEG
+powerProfile="false" # true or false - enable or disable the power profiling
+enableMetrics="true" # true or false - enable or disable the the PSNR, SSIM and VMAF metric calculation
+
+CODECs=( "h264" "h265" "vp9" )
+# declare -a CODECs=( "h264" "h265" "vp9" "av1" )
+
+# CRFs=( 51 )
+# CRFs=( 0 18 23 28 51 )
+CRFs=( 15 35 51 )
