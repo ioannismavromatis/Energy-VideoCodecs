@@ -4,7 +4,7 @@
 ########################   Global Variables  #############################
 ##########################################################################
 
-source settings
+source settings.cfg
 
 rootpath=$(pwd)
 
@@ -39,12 +39,12 @@ function deletePrevious () {
     fi
 
     if [[ ! -z $(ls -l $rootpath/psnr/) ]]; then
-        echo "FFMPEG folder not empty - remove all files and directories"
+        echo "PSNR folder not empty - remove all files and directories"
         rm -r $rootpath/psnr
     fi
 
     if [[ ! -z $(ls -l $rootpath/ssim/) ]]; then
-        echo "FFMPEG folder not empty - remove all files and directories"
+        echo "SSIM folder not empty - remove all files and directories"
         rm -r $rootpath/ssim
     fi
 
@@ -194,34 +194,37 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
             
             codec="h264"
             for crf in "${CRFs[@]}"; do
-                encodeName="${filename}_encoded_crf_${crf}_${iteration}"
-                encodeFullPath="./encoded/$codec/"$encodeName".mp4"
-                decodeName="${filename}_decoded_crf_${crf}_${iteration}"
-                decodeFullPath="./decoded/$codec/"$encodeName".yuv"
+                encodeFullName="${filename}_encoded_crf_${crf}_${iteration}"
+                videoEncodeName="${filename}_encoded_crf_${crf}"
+                encodeFullPath="./encoded/$codec/"$videoEncodeName".mp4"
                 
-                export FFREPORT=file=./ffmpeg/$codec/$encodeName.log:level=32
+                decodeFullName="${filename}_decoded_crf_${crf}_${iteration}"
+                videoDecodeName="${filename}_decoded_crf_${crf}"
+                decodeFullPath="./decoded/$codec/"$videoDecodeName".yuv"
+
+                export FFREPORT=file=./ffmpeg/$codec/$encodeFullName.log:level=32
                 if [[ $powerProfile == "true" ]]; then
-                    ./intelgadget ./csv/$codec/${encodeName}.csv &
-                    ./sampleCPU.sh ./samplecpu/$codec/${encodeName} &
+                    ./intelgadget ./csv/$codec/${encodeFullName}.csv &
+                    ./sampleCPU.sh ./samplecpu/$codec/${encodeFullName} &
                 fi
                 if [[ $enableFFMPEG == "true" ]]; then
-                    ffmpeg  -s $resolution -n -r 60 -pix_fmt yuv420p10le -i ./input/${filename}.yuv -c:v libx264  -preset ${preset}  -crf ${crf}  $encodeFullPath
+                    ffmpeg  -s $resolution -y -r 60 -pix_fmt yuv420p10le -i ./input/${filename}.yuv -c:v libx264  -preset ${preset}  -crf ${crf}  $encodeFullPath
                 fi
                 killProcesses
 
-                export FFREPORT=file=./ffmpeg/$codec/$decodeName.log:level=32
+                export FFREPORT=file=./ffmpeg/$codec/$decodeFullName.log:level=32
                 if [[ $powerProfile == "true" ]]; then
-                    ./intelgadget ./csv/$codec/${decodeName}.csv &
-                    ./sampleCPU.sh ./samplecpu/$codec/${decodeName} &
+                    ./intelgadget ./csv/$codec/${decodeFullName}.csv &
+                    ./sampleCPU.sh ./samplecpu/$codec/${decodeFullName} &
                 fi
                 if [[ $enableFFMPEG == "true" ]]; then
-                    ffmpeg -i $encodeFullPath $decodeFullPath
+                    ffmpeg -i $encodeFullPath -y $decodeFullPath
                 fi
                 killProcesses
 
                 # ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi libvmaf="model_path=vmaf_v0.6.1.pkl":log_path=vmaf_logfile.txt -f null –
-                PSNR_SSIM_filename="${filename}_${iteration}"
-                if [[ $enableMetrics == "true" ]]; then
+                PSNR_SSIM_filename="${filename}_crf_${crf}"
+                if [[ $enableMetrics == "true" ]] && [[ $iteration == $RUN_ITERATIONS ]]; then
                     ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi psnr=stats_file=./psnr/$codec/${PSNR_SSIM_filename}.txt -f null –
                     ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi ssim=stats_file=./ssim/$codec/${PSNR_SSIM_filename}.txt -f null -
                 fi
@@ -235,34 +238,37 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
 
             codec="h265"
             for crf in "${CRFs[@]}"; do
-                encodeName="${filename}_encoded_crf_${crf}_${iteration}"
-                encodeFullPath="./encoded/$codec/"$encodeName".mp4"
-                decodeName="${filename}_decoded_crf_${crf}_${iteration}"
-                decodeFullPath="./decoded/$codec/"$encodeName".yuv"
+                encodeFullName="${filename}_encoded_crf_${crf}_${iteration}"
+                videoEncodeName="${filename}_encoded_crf_${crf}"
+                encodeFullPath="./encoded/$codec/"$videoEncodeName".mp4"
+                
+                decodeFullName="${filename}_decoded_crf_${crf}_${iteration}"
+                videoDecodeName="${filename}_decoded_crf_${crf}"
+                decodeFullPath="./decoded/$codec/"$videoDecodeName".yuv"
 
-                export FFREPORT=file=./ffmpeg/$codec/$encodeName.log:level=32
+                export FFREPORT=file=./ffmpeg/$codec/$encodeFullName.log:level=32
                 if [[ $powerProfile == "true" ]]; then
-                    ./intelgadget ./csv/$codec/${encodeName}.csv &
-                    ./sampleCPU.sh ./samplecpu/$codec/${encodeName} &
+                    ./intelgadget ./csv/$codec/${encodeFullName}.csv &
+                    ./sampleCPU.sh ./samplecpu/$codec/${encodeFullName} &
                 fi
                 if [[ $enableFFMPEG == "true" ]]; then
-                    ffmpeg  -s $resolution -n -r 60 -pix_fmt yuv420p10le -i ./input/${filename}.yuv -c:v libx265  -preset ${preset}  -crf ${crf}  $encodeFullPath
+                    ffmpeg  -s $resolution -y -r 60 -pix_fmt yuv420p10le -i ./input/${filename}.yuv -c:v libx265  -preset ${preset}  -crf ${crf}  $encodeFullPath
                 fi
                 killProcesses
 
-                export FFREPORT=file=./ffmpeg/$codec/$decodeName.log:level=32
+                export FFREPORT=file=./ffmpeg/$codec/$decodeFullName.log:level=32
                 if [[ $powerProfile == "true" ]]; then
-                    ./intelgadget ./csv/$codec/${decodeName}.csv &
-                    ./sampleCPU.sh ./samplecpu/$codec/${decodeName} &
+                    ./intelgadget ./csv/$codec/${decodeFullName}.csv &
+                    ./sampleCPU.sh ./samplecpu/$codec/${decodeFullName} &
                 fi
                 if [[ $enableFFMPEG == "true" ]]; then
-                    ffmpeg -i $encodeFullPath $decodeFullPath
+                    ffmpeg -i $encodeFullPath -y $decodeFullPath
                 fi
                 killProcesses
 
                 # ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi libvmaf="model_path=vmaf_v0.6.1.pkl":log_path=vmaf_logfile.txt -f null –
-                PSNR_SSIM_filename="${filename}_${iteration}"
-                if [[ $enableMetrics == "true" ]]; then
+                PSNR_SSIM_filename="${filename}_crf_${crf}"
+                if [[ $enableMetrics == "true" ]] && [[ $iteration == $RUN_ITERATIONS ]]; then
                     ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi psnr=stats_file=./psnr/$codec/${PSNR_SSIM_filename}.txt -f null –
                     ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi ssim=stats_file=./ssim/$codec/${PSNR_SSIM_filename}.txt -f null -
                 fi
@@ -278,34 +284,37 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
 
             codec="vp9"
             for crf in "${CRFs[@]}"; do
-                encodeName="${filename}_encoded_crf_${crf}_${iteration}"
-                encodeFullPath="./encoded/$codec/"$encodeName".mp4"
-                decodeName="${filename}_decoded_crf_${crf}_${iteration}"
-                decodeFullPath="./decoded/$codec/"$encodeName".yuv"
+                encodeFullName="${filename}_encoded_crf_${crf}_${iteration}"
+                videoEncodeName="${filename}_encoded_crf_${crf}"
+                encodeFullPath="./encoded/$codec/"$videoEncodeName".mp4"
+                
+                decodeFullName="${filename}_decoded_crf_${crf}_${iteration}"
+                videoDecodeName="${filename}_decoded_crf_${crf}"
+                decodeFullPath="./decoded/$codec/"$videoDecodeName".yuv"
 
-                export FFREPORT=file=./ffmpeg/$codec/$decodeName.log:level=32
+                export FFREPORT=file=./ffmpeg/$codec/$decodeFullName.log:level=32
                 if [[ $powerProfile == "true" ]]; then
-                    ./intelgadget ./csv/$codec/${encodeName}.csv &
-                    ./sampleCPU.sh ./samplecpu/$codec/${encodeName} &
+                    ./intelgadget ./csv/$codec/${encodeFullName}.csv &
+                    ./sampleCPU.sh ./samplecpu/$codec/${encodeFullName} &
                 fi
                 if [[ $enableFFMPEG == "true" ]]; then
-                    ffmpeg  -s $resolution -n -r 60 -pix_fmt yuv420p10le -i ./input/${filename}.yuv -c:v libvpx-vp9 -row-mt 1 -crf ${crf} -b:v 0 $encodeFullPath
+                    ffmpeg  -s $resolution -y -r 60 -pix_fmt yuv420p10le -i ./input/${filename}.yuv -c:v libvpx-vp9 -row-mt 1 -crf ${crf} -b:v 0 $encodeFullPath
                 fi
                 killProcesses
 
-                export FFREPORT=file=./ffmpeg/$codec/$decodeName.log:level=32
+                export FFREPORT=file=./ffmpeg/$codec/$decodeFullName.log:level=32
                 if [[ $powerProfile == "true" ]]; then
-                    ./intelgadget ./csv/$codec/${decodeName}.csv &
-                    ./sampleCPU.sh ./samplecpu/$codec/${decodeName} &
+                    ./intelgadget ./csv/$codec/${decodeFullName}.csv &
+                    ./sampleCPU.sh ./samplecpu/$codec/${decodeFullName} &
                 fi
                 if [[ $enableFFMPEG == "true" ]]; then
-                    ffmpeg -i $encodeFullPath $decodeFullPath
+                    ffmpeg -i $encodeFullPath -y $decodeFullPath
                 fi
                 killProcesses
 
                 # ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi libvmaf="model_path=vmaf_v0.6.1.pkl":log_path=vmaf_logfile.txt -f null –
-                PSNR_SSIM_filename="${filename}_${iteration}"
-                if [[ $enableMetrics == "true" ]]; then
+                PSNR_SSIM_filename="${filename}_crf_${crf}"
+                if [[ $enableMetrics == "true" ]] && [[ $iteration == $RUN_ITERATIONS ]]; then
                     ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi psnr=stats_file=./psnr/$codec/${PSNR_SSIM_filename}.txt -f null –
                     ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi ssim=stats_file=./ssim/$codec/${PSNR_SSIM_filename}.txt -f null -
                 fi
