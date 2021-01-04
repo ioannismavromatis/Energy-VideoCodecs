@@ -19,8 +19,8 @@ inputFolder = "./input/*.mp4";
 
 CODECs =[ "h264" "h265" "vp9" ];
 CRFs = [ 15 35 51 ];
-iterations = 2;
-idle_iterations = 2;
+iterations = 4;
+idle_iterations = 10;
 
 col=@(x)reshape(x,numel(x),1);
 boxplot2=@(C,varargin)boxplot(cell2mat(cellfun(col,col(C),'uni',0)),cell2mat(arrayfun(@(I)I*ones(numel(C{I}),1),col(1:numel(C)),'uni',0)),varargin{:});
@@ -53,13 +53,13 @@ subplot(2,1,1)
 boxplot2(toPlotIA)
 title('Idle IA and DRAM power consumption (per 100ms)')
 xlabel('Iteration')
-ylabel('Watt')
+ylabel('Watt (IA)')
 set(gca,'FontSize', 18)
 
 subplot(2,1,2)
 boxplot2(toPlotDRAM)
 xlabel('Iteration')
-ylabel('Watt')
+ylabel('Watt (DRAM)')
 set(gca,'FontSize', 18)
 
 
@@ -130,7 +130,7 @@ for name = 1:length(names)
     results(name).dataDecDRAM = dataDecDRAM;
     
     results(name).dataCPUEnc = dataCPUEnc;
-%     results(name).dataCPUDec = dataCPUDec;
+    results(name).dataCPUDec = dataCPUDec;
 end
 
 
@@ -157,10 +157,31 @@ for name = 1:length(names)
             title(str,'Interpreter', 'none', 'FontSize', 20)
         end
     end
-end
-
-for name = 1:length(names)
+    
     mydata = [];
+    figure('units','normalized','outerposition',[0 0 1 1])
+    for iteration = 1:iterations
+        for codec = 1:length(CODECs)
+            for crf = 1:length(CRFs)
+                tmp(crf) = results(name).dataDecDRAM(iteration,codec,crf);
+            end
+            maxNumEl = max(cellfun(@numel,tmp));
+            Cpad = cellfun(@(x){padarray(x(:),[maxNumEl-numel(x),0],NaN,'post')}, tmp);
+            mydata{codec} = cell2mat(Cpad);
+            
+        end
+        subplot(iterations,1,iteration)
+        
+        boxplotGroup(mydata, 'PrimaryLabels', {'15' '35' '51'}, 'SecondaryLabels', {'h264' 'h265' 'vp9'}, 'GroupLines', true);
+        str = [ 'Watts (No. of iteration = ' num2str(iteration) ')' ];
+        ylabel(str)
+        if (iteration == 1) 
+            str = [ names{name} ' - Decoder - DRAM Power (in Watts)' ];
+            title(str,'Interpreter', 'none', 'FontSize', 20)
+        end
+    end
+    
+        mydata = [];
     figure('units','normalized','outerposition',[0 0 1 1])
     for iteration = 1:iterations
         for codec = 1:length(CODECs)
@@ -182,4 +203,28 @@ for name = 1:length(names)
             title(str,'Interpreter', 'none', 'FontSize', 20)
         end
     end
+    
+    mydata = [];
+    figure('units','normalized','outerposition',[0 0 1 1])
+    for iteration = 1:iterations
+        for codec = 1:length(CODECs)
+            for crf = 1:length(CRFs)
+                tmp(crf) = results(name).dataEncDRAM(iteration,codec,crf);
+            end
+            maxNumEl = max(cellfun(@numel,tmp));
+            Cpad = cellfun(@(x){padarray(x(:),[maxNumEl-numel(x),0],NaN,'post')}, tmp);
+            mydata{codec} = cell2mat(Cpad);
+            
+        end
+        subplot(iterations,1,iteration)
+        
+        boxplotGroup(mydata, 'PrimaryLabels', {'15' '35' '51'}, 'SecondaryLabels', {'h264' 'h265' 'vp9'}, 'GroupLines', true);
+        str = [ 'Watts (No. of iteration = ' num2str(iteration) ')' ];
+        ylabel(str)
+        if (iteration == 1) 
+            str = [ names{name} ' - Encoder - DRAM Power (in Watts)' ];
+            title(str,'Interpreter', 'none', 'FontSize', 20)
+        end
+    end
 end
+

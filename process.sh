@@ -292,7 +292,7 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
                 videoDecodeName="${filename}_decoded_crf_${crf}"
                 decodeFullPath="./decoded/$codec/"$videoDecodeName".yuv"
 
-                export FFREPORT=file=./ffmpeg/$codec/$decodeFullName.log:level=32
+                export FFREPORT=file=./ffmpeg/$codec/$encodeFullName.log:level=32
                 if [[ $powerProfile == "true" ]]; then
                     ./intelgadget ./csv/$codec/${encodeFullName}.csv &
                     ./sampleCPU.sh ./samplecpu/$codec/${encodeFullName} &
