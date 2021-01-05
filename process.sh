@@ -186,6 +186,8 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
         filename=${name%.mp4}
         echo "Run the process for: "$filename
         resolution=$(echo $filename | awk '{ split($0,ar,"_"); print ar[2]}')
+        fps=$(echo $filename | awk '{ split($0,ar,"_"); print ar[3]}')
+        fps=${fps%???}
 
         ffmpeg -i ./input/$filename.mp4 -n ./input/$filename.yuv
     
@@ -207,8 +209,8 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
                     ./intelgadget ./csv/$codec/${encodeFullName}.csv &
                     ./sampleCPU.sh ./samplecpu/$codec/${encodeFullName} &
                 fi
-                if [[ $enableFFMPEG == "true" ]]; then
-                    ffmpeg  -s $resolution -y -r 60 -pix_fmt yuv420p10le -i ./input/${filename}.yuv -c:v libx264  -preset ${preset}  -crf ${crf}  $encodeFullPath
+                if [[ $encodeFFMPEG == "true" ]]; then
+                    ffmpeg  -s $resolution -y -r $fps -pix_fmt yuv420p10le -i ./input/${filename}.yuv -c:v libx264  -preset ${preset}  -crf ${crf}  $encodeFullPath
                 fi
                 killProcesses
 
@@ -217,7 +219,7 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
                     ./intelgadget ./csv/$codec/${decodeFullName}.csv &
                     ./sampleCPU.sh ./samplecpu/$codec/${decodeFullName} &
                 fi
-                if [[ $enableFFMPEG == "true" ]]; then
+                if [[ $decodeFFMPEG == "true" ]]; then
                     ffmpeg -i $encodeFullPath -y $decodeFullPath
                 fi
                 killProcesses
@@ -251,8 +253,8 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
                     ./intelgadget ./csv/$codec/${encodeFullName}.csv &
                     ./sampleCPU.sh ./samplecpu/$codec/${encodeFullName} &
                 fi
-                if [[ $enableFFMPEG == "true" ]]; then
-                    ffmpeg  -s $resolution -y -r 60 -pix_fmt yuv420p10le -i ./input/${filename}.yuv -c:v libx265  -preset ${preset}  -crf ${crf}  $encodeFullPath
+                if [[ $encodeFFMPEG == "true" ]]; then
+                    ffmpeg  -s $resolution -y -r $fps -pix_fmt yuv420p10le -i ./input/${filename}.yuv -c:v libx265  -preset ${preset}  -crf ${crf}  $encodeFullPath
                 fi
                 killProcesses
 
@@ -261,7 +263,7 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
                     ./intelgadget ./csv/$codec/${decodeFullName}.csv &
                     ./sampleCPU.sh ./samplecpu/$codec/${decodeFullName} &
                 fi
-                if [[ $enableFFMPEG == "true" ]]; then
+                if [[ $decodeFFMPEG == "true" ]]; then
                     ffmpeg -i $encodeFullPath -y $decodeFullPath
                 fi
                 killProcesses
@@ -297,8 +299,8 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
                     ./intelgadget ./csv/$codec/${encodeFullName}.csv &
                     ./sampleCPU.sh ./samplecpu/$codec/${encodeFullName} &
                 fi
-                if [[ $enableFFMPEG == "true" ]]; then
-                    ffmpeg  -s $resolution -y -r 60 -pix_fmt yuv420p10le -i ./input/${filename}.yuv -c:v libvpx-vp9 -row-mt 1 -crf ${crf} -b:v 0 $encodeFullPath
+                if [[ $encodeFFMPEG == "true" ]]; then
+                    ffmpeg  -s $resolution -y -r $fps -pix_fmt yuv420p10le -i ./input/${filename}.yuv -c:v libvpx-vp9 -row-mt 1 -crf ${crf} -b:v 0 $encodeFullPath
                 fi
                 killProcesses
 
@@ -307,7 +309,7 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
                     ./intelgadget ./csv/$codec/${decodeFullName}.csv &
                     ./sampleCPU.sh ./samplecpu/$codec/${decodeFullName} &
                 fi
-                if [[ $enableFFMPEG == "true" ]]; then
+                if [[ $decodeFFMPEG == "true" ]]; then
                     ffmpeg -i $encodeFullPath -y $decodeFullPath
                 fi
                 killProcesses

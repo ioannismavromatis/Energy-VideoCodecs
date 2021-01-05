@@ -135,24 +135,27 @@ end
 
 
 for name = 1:length(names)
-    mydataRAPL = [];
-    mydataSampleCPU = [];
+    %     Decoding CPU utilisation and Power
     figure('units','normalized','outerposition',[0 0 1 1])
     for iteration = 1:iterations
-        for codec = 1:length(CODECs)
-            for crf = 1:length(CRFs)
-                tmp(crf) = results(name).dataDecIA(iteration,codec,crf);
+        mydataRAPL = [];
+        mydataSampleCPU = [];
+
+        for crf = 1:length(CRFs)
+            for codec = 1:length(CODECs)
+                tmp(codec) = results(name).dataDecIA(iteration,codec,crf);                
             end
+            
             maxNumEl = max(cellfun(@numel,tmp));
             Cpad = cellfun(@(x){padarray(x(:),[maxNumEl-numel(x),0],NaN,'post')}, tmp);
-            mydataRAPL{codec} = cell2mat(Cpad);
+            mydataRAPL{crf} = cell2mat(Cpad);
             
-            for crf = 1:length(CRFs)
-                tmp2(crf) = results(name).dataCPUDec(iteration,codec,crf);
+            for codec = 1:length(CODECs)
+                tmp2(codec) = results(name).dataCPUDec(iteration,codec,crf);
             end
             maxNumEl = max(cellfun(@numel,tmp2));
             Cpad = cellfun(@(x){padarray(x(:),[maxNumEl-numel(x),0],NaN,'post')}, tmp2);
-            mydataSampleCPU{codec} = cell2mat(Cpad);
+            mydataSampleCPU{crf} = cell2mat(Cpad);
         end
         
         subplot(iterations,2,(iteration*2)-1)
@@ -176,16 +179,17 @@ for name = 1:length(names)
         end
     end
     
-    mydataRAPL = [];
+    %     Decoding DRAM power
     figure('units','normalized','outerposition',[0 0 1 1])
     for iteration = 1:iterations
-        for codec = 1:length(CODECs)
-            for crf = 1:length(CRFs)
-                tmp(crf) = results(name).dataDecDRAM(iteration,codec,crf);
+        mydataRAPL = [];
+        for crf = 1:length(CRFs)
+            for codec = 1:length(CODECs)
+                tmp(codec) = results(name).dataDecDRAM(iteration,codec,crf);
             end
             maxNumEl = max(cellfun(@numel,tmp));
             Cpad = cellfun(@(x){padarray(x(:),[maxNumEl-numel(x),0],NaN,'post')}, tmp);
-            mydataRAPL{codec} = cell2mat(Cpad);
+            mydataRAPL{crf} = cell2mat(Cpad);
             
         end
         subplot(iterations,1,iteration)
@@ -199,24 +203,25 @@ for name = 1:length(names)
         end
     end
     
-    mydataRAPL = [];
-    mydataSampleCPU = [];
+    %     Encoding CPU utilisation and Power
     figure('units','normalized','outerposition',[0 0 1 1])
     for iteration = 1:iterations
-        for codec = 1:length(CODECs)
-            for crf = 1:length(CRFs)
-                tmp(crf) = results(name).dataEncIA(iteration,codec,crf);
+        mydataRAPL = [];
+        mydataSampleCPU = [];
+        for crf = 1:length(CRFs)
+            for codec = 1:length(CODECs)
+                tmp(codec) = results(name).dataEncIA(iteration,codec,crf);
             end
             maxNumEl = max(cellfun(@numel,tmp));
             Cpad = cellfun(@(x){padarray(x(:),[maxNumEl-numel(x),0],NaN,'post')}, tmp);
-            mydataRAPL{codec} = cell2mat(Cpad);
+            mydataRAPL{crf} = cell2mat(Cpad);
             
-            for crf = 1:length(CRFs)
-                tmp2(crf) = results(name).dataCPUEnc(iteration,codec,crf);
+            for codec = 1:length(CODECs)
+                tmp2(codec) = results(name).dataCPUEnc(iteration,codec,crf);
             end
             maxNumEl = max(cellfun(@numel,tmp2));
             Cpad = cellfun(@(x){padarray(x(:),[maxNumEl-numel(x),0],NaN,'post')}, tmp2);
-            mydataSampleCPU{codec} = cell2mat(Cpad);
+            mydataSampleCPU{crf} = cell2mat(Cpad);
         end
         
         subplot(iterations,2,(iteration*2)-1)
@@ -239,16 +244,17 @@ for name = 1:length(names)
         end
     end
     
-    mydataRAPL = [];
+    %     Encoding DRAM power
     figure('units','normalized','outerposition',[0 0 1 1])
     for iteration = 1:iterations
-        for codec = 1:length(CODECs)
-            for crf = 1:length(CRFs)
-                tmp(crf) = results(name).dataEncDRAM(iteration,codec,crf);
+        mydataRAPL = [];
+        for crf = 1:length(CRFs)
+            for codec = 1:length(CODECs)
+                tmp(codec) = results(name).dataEncDRAM(iteration,codec,crf);
             end
             maxNumEl = max(cellfun(@numel,tmp));
             Cpad = cellfun(@(x){padarray(x(:),[maxNumEl-numel(x),0],NaN,'post')}, tmp);
-            mydataRAPL{codec} = cell2mat(Cpad);
+            mydataRAPL{crf} = cell2mat(Cpad);
             
         end
         subplot(iterations,1,iteration)
