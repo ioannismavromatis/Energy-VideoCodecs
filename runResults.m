@@ -22,6 +22,9 @@ CRFs = [ 15 35 51 ];
 iterations = 4;
 idle_iterations = 10;
 
+marker = [ 'o' '+' '*' 's' 'd'];
+lineStyle = [ '-' '--' ':' '-.' ];
+
 col=@(x)reshape(x,numel(x),1);
 boxplot2=@(C,varargin)boxplot(cell2mat(cellfun(col,col(C),'uni',0)),cell2mat(arrayfun(@(I)I*ones(numel(C{I}),1),col(1:numel(C)),'uni',0)),varargin{:});
 
@@ -104,8 +107,43 @@ for name = 1:length(names)
                 path = [ './samplecpu/' CODECs(codec) '/' names(name) '_decoded_crf_' CRFs(crf) '_' iteration '.log' ];
                 path = strjoin(path,'');
                 dataCPUDec{iteration,codec,crf} = importCPUUtilisation(path);
-                
             end
+            
+            path = [ './psnr/' CODECs(codec) '/' names(name) '_crf_' CRFs(crf) '.txt' ];
+            path = strjoin(path,'');
+            allPSNR = importPSNR(path);
+            allPSNRArray = table2array(allPSNR);
+            
+            dataPSNR{codec,crf} = allPSNRArray(:,6);
+            
+            path = [ './ssim/' CODECs(codec) '/' names(name) '_crf_' CRFs(crf) '.txt' ];
+            path = strjoin(path,'');
+            allSSIM = importSSIM(path);
+            allSSIMArray = table2array(allSSIM);
+            
+            dataSSIM{codec,crf} = allSSIMArray(:,5);
+            
+            % Path to encoded video
+            path = [ './encoded/' CODECs(codec) '/' names(name) '_encoded_crf_' CRFs(crf) '.mp4' ];
+            path = strjoin(path,'');
+            
+            s = dir(path);
+            bitrate(codec,crf) = s.bytes * 8 * fps(name) / 300/1000;
+            
+            averageCumEncIA = 0;
+            for iteration = 1:iterations
+                averageCumEncIA = averageCumEncIA + cumWattsEncIA(iteration,codec,crf);
+            end
+            averageCumEncIA = averageCumEncIA / iterations;
+            
+            averageCumEncDRAM = 0;
+            for iteration = 1:iterations
+                averageCumEncDRAM = averageCumEncDRAM + cumWattsEncDRAM(iteration,codec,crf);
+            end
+            averageCumEncDRAM = averageCumEncDRAM / iterations;
+            
+            averageCumEncOverall(codec,crf) = averageCumEncDRAM + averageCumEncIA;
+        
         end
     end
     
@@ -114,6 +152,7 @@ for name = 1:length(names)
     results(name).resolution = resolution(name);
     results(name).bit = bit(name);
     results(name).chroma = chroma(name);
+    results(name).bitrate = bitrate;
     
     results(name).avgWattsEncIA = avgWattsEncIA;
     results(name).cumWattsEncIA = cumWattsEncIA;
@@ -121,6 +160,7 @@ for name = 1:length(names)
     results(name).avgWattsEncDRAM = avgWattsEncDRAM;
     results(name).cumWattsEncDRAM = cumWattsEncDRAM;
     results(name).dataEncDRAM = dataEncDRAM;
+    results(name).averageCumEncOverall = averageCumEncOverall;
     
     results(name).avgWattsDecIA = avgWattsDecIA;
     results(name).cumWattsDecIA = cumWattsDecIA;
@@ -131,141 +171,230 @@ for name = 1:length(names)
     
     results(name).dataCPUEnc = dataCPUEnc;
     results(name).dataCPUDec = dataCPUDec;
+    
+    metrics(name).dataPSNR = dataPSNR;
+    metrics(name).dataSSIM = dataSSIM;
 end
 
+
+% for name = 1:length(names)
+%     %     Decoding CPU utilisation and Power
+%     figure('units','normalized','outerposition',[0 0 1 1])
+%     for iteration = 1:iterations
+%         mydataRAPL = [];
+%         mydataSampleCPU = [];
+% 
+%         for crf = 1:length(CRFs)
+%             for codec = 1:length(CODECs)
+%                 tmp(codec) = results(name).dataDecIA(iteration,codec,crf);                
+%             end
+%             
+%             maxNumEl = max(cellfun(@numel,tmp));
+%             Cpad = cellfun(@(x){padarray(x(:),[maxNumEl-numel(x),0],NaN,'post')}, tmp);
+%             mydataRAPL{crf} = cell2mat(Cpad);
+%             
+%             for codec = 1:length(CODECs)
+%                 tmp2(codec) = results(name).dataCPUDec(iteration,codec,crf);
+%             end
+%             maxNumEl = max(cellfun(@numel,tmp2));
+%             Cpad = cellfun(@(x){padarray(x(:),[maxNumEl-numel(x),0],NaN,'post')}, tmp2);
+%             mydataSampleCPU{crf} = cell2mat(Cpad);
+%         end
+%         
+%         subplot(iterations,2,(iteration*2)-1)
+%         
+%         boxplotGroup(mydataRAPL, 'PrimaryLabels', {'15' '35' '51'}, 'SecondaryLabels', {'h264' 'h265' 'vp9'}, 'GroupLines', true);
+%         str = [ 'Watts (No. of iteration = ' num2str(iteration) ')' ];
+%         ylabel(str)
+%         if (iteration == 1) 
+%             str = [ names{name} ' - Decoder - IA Power (in Watts)' ];
+%             title(str,'Interpreter', 'none', 'FontSize', 20)
+%         end
+%         
+%         subplot(iterations,2,(iteration*2))
+%         
+%         boxplotGroup(mydataSampleCPU, 'PrimaryLabels', {'15' '35' '51'}, 'SecondaryLabels', {'h264' 'h265' 'vp9'}, 'GroupLines', true);
+%         str = [ '% (No. of iteration = ' num2str(iteration) ')' ];
+%         ylabel(str)
+%         if (iteration == 1) 
+%             str = [ names{name} ' - Decoder - CPU Utilisation (in %)' ];
+%             title(str,'Interpreter', 'none', 'FontSize', 20)
+%         end
+%     end
+%     
+%     %     Decoding DRAM power
+%     figure('units','normalized','outerposition',[0 0 1 1])
+%     for iteration = 1:iterations
+%         mydataRAPL = [];
+%         for crf = 1:length(CRFs)
+%             for codec = 1:length(CODECs)
+%                 tmp(codec) = results(name).dataDecDRAM(iteration,codec,crf);
+%             end
+%             maxNumEl = max(cellfun(@numel,tmp));
+%             Cpad = cellfun(@(x){padarray(x(:),[maxNumEl-numel(x),0],NaN,'post')}, tmp);
+%             mydataRAPL{crf} = cell2mat(Cpad);
+%             
+%         end
+%         subplot(iterations,1,iteration)
+%         
+%         boxplotGroup(mydataRAPL, 'PrimaryLabels', {'15' '35' '51'}, 'SecondaryLabels', {'h264' 'h265' 'vp9'}, 'GroupLines', true);
+%         str = [ 'Watts (No. of iteration = ' num2str(iteration) ')' ];
+%         ylabel(str)
+%         if (iteration == 1) 
+%             str = [ names{name} ' - Decoder - DRAM Power (in Watts)' ];
+%             title(str,'Interpreter', 'none', 'FontSize', 20)
+%         end
+%     end
+%     
+%     %     Encoding CPU utilisation and Power
+%     figure('units','normalized','outerposition',[0 0 1 1])
+%     for iteration = 1:iterations
+%         mydataRAPL = [];
+%         mydataSampleCPU = [];
+%         for crf = 1:length(CRFs)
+%             for codec = 1:length(CODECs)
+%                 tmp(codec) = results(name).dataEncIA(iteration,codec,crf);
+%             end
+%             maxNumEl = max(cellfun(@numel,tmp));
+%             Cpad = cellfun(@(x){padarray(x(:),[maxNumEl-numel(x),0],NaN,'post')}, tmp);
+%             mydataRAPL{crf} = cell2mat(Cpad);
+%             
+%             for codec = 1:length(CODECs)
+%                 tmp2(codec) = results(name).dataCPUEnc(iteration,codec,crf);
+%             end
+%             maxNumEl = max(cellfun(@numel,tmp2));
+%             Cpad = cellfun(@(x){padarray(x(:),[maxNumEl-numel(x),0],NaN,'post')}, tmp2);
+%             mydataSampleCPU{crf} = cell2mat(Cpad);
+%         end
+%         
+%         subplot(iterations,2,(iteration*2)-1)
+%         
+%         boxplotGroup(mydataRAPL, 'PrimaryLabels', {'15' '35' '51'}, 'SecondaryLabels', {'h264' 'h265' 'vp9'}, 'GroupLines', true);
+%         str = [ 'Watts (No. of iteration = ' num2str(iteration) ')' ];
+%         ylabel(str)
+%         if (iteration == 1) 
+%             str = [ names{name} ' - Encoder - IA Power (in Watts)' ];
+%             title(str,'Interpreter', 'none', 'FontSize', 20)
+%         end
+%         
+%         subplot(iterations,2,(iteration*2))
+%         boxplotGroup(mydataSampleCPU, 'PrimaryLabels', {'15' '35' '51'}, 'SecondaryLabels', {'h264' 'h265' 'vp9'}, 'GroupLines', true);
+%         str = [ '% (No. of iteration = ' num2str(iteration) ')' ];
+%         ylabel(str)
+%         if (iteration == 1) 
+%             str = [ names{name} ' - Encoder - CPU Utilisation (in %)' ];
+%             title(str,'Interpreter', 'none', 'FontSize', 20)
+%         end
+%     end
+%     
+%     %     Encoding DRAM power
+%     figure('units','normalized','outerposition',[0 0 1 1])
+%     for iteration = 1:iterations
+%         mydataRAPL = [];
+%         for crf = 1:length(CRFs)
+%             for codec = 1:length(CODECs)
+%                 tmp(codec) = results(name).dataEncDRAM(iteration,codec,crf);
+%             end
+%             maxNumEl = max(cellfun(@numel,tmp));
+%             Cpad = cellfun(@(x){padarray(x(:),[maxNumEl-numel(x),0],NaN,'post')}, tmp);
+%             mydataRAPL{crf} = cell2mat(Cpad);
+%             
+%         end
+%         subplot(iterations,1,iteration)
+%         
+%         boxplotGroup(mydataRAPL, 'PrimaryLabels', {'15' '35' '51'}, 'SecondaryLabels', {'h264' 'h265' 'vp9'}, 'GroupLines', true);
+%         str = [ 'Watts (No. of iteration = ' num2str(iteration) ')' ];
+%         ylabel(str)
+%         if (iteration == 1) 
+%             str = [ names{name} ' - Encoder - DRAM Power (in Watts)' ];
+%             title(str,'Interpreter', 'none', 'FontSize', 20)
+%         end
+%     end
+% end
 
 for name = 1:length(names)
-    %     Decoding CPU utilisation and Power
+    for i = 1:length(CRFs)
+        txt(i) = string([num2str(CRFs(i)) ' \rightarrow' ]);
+    end
+    
     figure('units','normalized','outerposition',[0 0 1 1])
-    for iteration = 1:iterations
-        mydataRAPL = [];
-        mydataSampleCPU = [];
+    
+    subplot(3,2,1)
+    for codec = 1:length(CODECs)
+        for crf = 1:length(CRFs)
+            avgPSNR(crf) = mean(metrics(name).dataPSNR{codec,crf});
+        end
+        plot(results(name).averageCumEncOverall(codec,:),avgPSNR, 'Marker',marker(codec),'MarkerSize',11,'LineStyle',lineStyle(codec), 'LineWidth',2)
+        text(results(name).averageCumEncOverall(codec,:),avgPSNR,txt,'FontSize',14,'HorizontalAlignment','right')
+        hold on
+    end
+    title(['Avg. Cumulative Energy - PSNR - CRFs \{' num2str(CRFs) '\}'])
+    xlabel('Avg. Cumulative Energy (Joule)')
+    ylabel('PSNR (dB)')
+    set(gca,'FontSize', 18)
+    grid on;
+    legend(CODECs{1},CODECs{2},CODECs{3})
 
-        for crf = 1:length(CRFs)
-            for codec = 1:length(CODECs)
-                tmp(codec) = results(name).dataDecIA(iteration,codec,crf);                
-            end
-            
-            maxNumEl = max(cellfun(@numel,tmp));
-            Cpad = cellfun(@(x){padarray(x(:),[maxNumEl-numel(x),0],NaN,'post')}, tmp);
-            mydataRAPL{crf} = cell2mat(Cpad);
-            
-            for codec = 1:length(CODECs)
-                tmp2(codec) = results(name).dataCPUDec(iteration,codec,crf);
-            end
-            maxNumEl = max(cellfun(@numel,tmp2));
-            Cpad = cellfun(@(x){padarray(x(:),[maxNumEl-numel(x),0],NaN,'post')}, tmp2);
-            mydataSampleCPU{crf} = cell2mat(Cpad);
-        end
-        
-        subplot(iterations,2,(iteration*2)-1)
-        
-        boxplotGroup(mydataRAPL, 'PrimaryLabels', {'15' '35' '51'}, 'SecondaryLabels', {'h264' 'h265' 'vp9'}, 'GroupLines', true);
-        str = [ 'Watts (No. of iteration = ' num2str(iteration) ')' ];
-        ylabel(str)
-        if (iteration == 1) 
-            str = [ names{name} ' - Decoder - IA Power (in Watts)' ];
-            title(str,'Interpreter', 'none', 'FontSize', 20)
-        end
-        
-        subplot(iterations,2,(iteration*2))
-        
-        boxplotGroup(mydataSampleCPU, 'PrimaryLabels', {'15' '35' '51'}, 'SecondaryLabels', {'h264' 'h265' 'vp9'}, 'GroupLines', true);
-        str = [ '% (No. of iteration = ' num2str(iteration) ')' ];
-        ylabel(str)
-        if (iteration == 1) 
-            str = [ names{name} ' - Decoder - CPU Utilisation (in %)' ];
-            title(str,'Interpreter', 'none', 'FontSize', 20)
-        end
-    end
     
-    %     Decoding DRAM power
-    figure('units','normalized','outerposition',[0 0 1 1])
-    for iteration = 1:iterations
-        mydataRAPL = [];
-        for crf = 1:length(CRFs)
-            for codec = 1:length(CODECs)
-                tmp(codec) = results(name).dataDecDRAM(iteration,codec,crf);
-            end
-            maxNumEl = max(cellfun(@numel,tmp));
-            Cpad = cellfun(@(x){padarray(x(:),[maxNumEl-numel(x),0],NaN,'post')}, tmp);
-            mydataRAPL{crf} = cell2mat(Cpad);
-            
-        end
-        subplot(iterations,1,iteration)
-        
-        boxplotGroup(mydataRAPL, 'PrimaryLabels', {'15' '35' '51'}, 'SecondaryLabels', {'h264' 'h265' 'vp9'}, 'GroupLines', true);
-        str = [ 'Watts (No. of iteration = ' num2str(iteration) ')' ];
-        ylabel(str)
-        if (iteration == 1) 
-            str = [ names{name} ' - Decoder - DRAM Power (in Watts)' ];
-            title(str,'Interpreter', 'none', 'FontSize', 20)
-        end
-    end
     
-    %     Encoding CPU utilisation and Power
-    figure('units','normalized','outerposition',[0 0 1 1])
-    for iteration = 1:iterations
-        mydataRAPL = [];
-        mydataSampleCPU = [];
+    subplot(3,2,2)
+    for codec = 1:length(CODECs)
         for crf = 1:length(CRFs)
-            for codec = 1:length(CODECs)
-                tmp(codec) = results(name).dataEncIA(iteration,codec,crf);
-            end
-            maxNumEl = max(cellfun(@numel,tmp));
-            Cpad = cellfun(@(x){padarray(x(:),[maxNumEl-numel(x),0],NaN,'post')}, tmp);
-            mydataRAPL{crf} = cell2mat(Cpad);
-            
-            for codec = 1:length(CODECs)
-                tmp2(codec) = results(name).dataCPUEnc(iteration,codec,crf);
-            end
-            maxNumEl = max(cellfun(@numel,tmp2));
-            Cpad = cellfun(@(x){padarray(x(:),[maxNumEl-numel(x),0],NaN,'post')}, tmp2);
-            mydataSampleCPU{crf} = cell2mat(Cpad);
+            avgSSIM(crf) = mean(metrics(name).dataSSIM{codec,crf});
         end
-        
-        subplot(iterations,2,(iteration*2)-1)
-        
-        boxplotGroup(mydataRAPL, 'PrimaryLabels', {'15' '35' '51'}, 'SecondaryLabels', {'h264' 'h265' 'vp9'}, 'GroupLines', true);
-        str = [ 'Watts (No. of iteration = ' num2str(iteration) ')' ];
-        ylabel(str)
-        if (iteration == 1) 
-            str = [ names{name} ' - Encoder - IA Power (in Watts)' ];
-            title(str,'Interpreter', 'none', 'FontSize', 20)
-        end
-        
-        subplot(iterations,2,(iteration*2))
-        boxplotGroup(mydataSampleCPU, 'PrimaryLabels', {'15' '35' '51'}, 'SecondaryLabels', {'h264' 'h265' 'vp9'}, 'GroupLines', true);
-        str = [ '% (No. of iteration = ' num2str(iteration) ')' ];
-        ylabel(str)
-        if (iteration == 1) 
-            str = [ names{name} ' - Encoder - CPU Utilisation (in %)' ];
-            title(str,'Interpreter', 'none', 'FontSize', 20)
-        end
+        plot(results(name).averageCumEncOverall(codec,:),avgSSIM, 'Marker',marker(codec),'MarkerSize',11,'LineStyle',lineStyle(codec), 'LineWidth',2)
+        text(results(name).averageCumEncOverall(codec,:),avgSSIM,txt,'FontSize',14,'HorizontalAlignment','right')
+        hold on
     end
+    title(['Avg. Cumulative Energy - SSIM - CRFs \{' num2str(CRFs) '\}'])
+    xlabel('Avg. Cumulative Energy (Joule)')
+    ylabel('Norm.')
+    set(gca,'FontSize', 18)
+    grid on;
+    legend(CODECs{1},CODECs{2},CODECs{3})
     
-    %     Encoding DRAM power
-    figure('units','normalized','outerposition',[0 0 1 1])
-    for iteration = 1:iterations
-        mydataRAPL = [];
+    subplot(3,2,3)
+    for codec = 1:length(CODECs)
         for crf = 1:length(CRFs)
-            for codec = 1:length(CODECs)
-                tmp(codec) = results(name).dataEncDRAM(iteration,codec,crf);
-            end
-            maxNumEl = max(cellfun(@numel,tmp));
-            Cpad = cellfun(@(x){padarray(x(:),[maxNumEl-numel(x),0],NaN,'post')}, tmp);
-            mydataRAPL{crf} = cell2mat(Cpad);
-            
+            avgPSNR(crf) = mean(metrics(name).dataPSNR{codec,crf});
         end
-        subplot(iterations,1,iteration)
-        
-        boxplotGroup(mydataRAPL, 'PrimaryLabels', {'15' '35' '51'}, 'SecondaryLabels', {'h264' 'h265' 'vp9'}, 'GroupLines', true);
-        str = [ 'Watts (No. of iteration = ' num2str(iteration) ')' ];
-        ylabel(str)
-        if (iteration == 1) 
-            str = [ names{name} ' - Encoder - DRAM Power (in Watts)' ];
-            title(str,'Interpreter', 'none', 'FontSize', 20)
-        end
+        plot(results(name).bitrate(codec,:),avgPSNR, 'Marker',marker(codec),'MarkerSize',11,'LineStyle',lineStyle(codec), 'LineWidth',2)
+        text(results(name).bitrate(codec,:),avgPSNR,txt,'FontSize',14,'HorizontalAlignment','right')
+        hold on
     end
+    title(['Bitrate - PSNR - CRFs \{' num2str(CRFs) '\}'])
+    xlabel('Bitrate (kbits per frame)')
+    ylabel('PSNR (dB)')
+    set(gca,'FontSize', 18)
+    grid on;
+    legend(CODECs{1},CODECs{2},CODECs{3})
+    
+    subplot(3,2,4)
+    for codec = 1:length(CODECs)
+        for crf = 1:length(CRFs)
+            avgSSIM(crf) = mean(metrics(name).dataSSIM{codec,crf});
+        end
+        plot(results(name).bitrate(codec,:),avgSSIM, 'Marker',marker(codec),'MarkerSize',11,'LineStyle',lineStyle(codec), 'LineWidth',2)
+        text(results(name).bitrate(codec,:),avgSSIM,txt,'FontSize',14,'HorizontalAlignment','right')
+        hold on
+    end
+    title(['Bitrate - SSIM - CRFs \{' num2str(CRFs) '\}'])
+    xlabel('Bitrate (kbits per frame)')
+    ylabel('Norm.')
+    set(gca,'FontSize', 18)
+    grid on;
+    legend(CODECs{1},CODECs{2},CODECs{3})
+    
+    subplot(3,2,5)
+    for codec = 1:length(CODECs)
+        plot(results(name).averageCumEncOverall(codec,:),results(name).bitrate(codec,:), 'Marker',marker(codec),'MarkerSize',11,'LineStyle',lineStyle(codec), 'LineWidth',2)
+        text(results(name).averageCumEncOverall(codec,:),results(name).bitrate(codec,:),txt,'FontSize',14,'HorizontalAlignment','right')
+        hold on
+    end
+    title(['Bitrate - SSIM - CRFs \{' num2str(CRFs) '\}'])
+    xlabel('Avg. Cumulative Energy (Joule)')
+    ylabel('Bitrate (kbits per frame)')
+    set(gca,'FontSize', 18)
+    grid on;
+    legend(CODECs{1},CODECs{2},CODECs{3})
 end
-
