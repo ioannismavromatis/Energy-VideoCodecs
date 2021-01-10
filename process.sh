@@ -207,17 +207,17 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
                 export FFREPORT=file=./ffmpeg/$codec/$encodeFullName.log:level=32
                 if [[ $powerProfile == "true" ]]; then
                     ./intelgadget ./csv/$codec/${encodeFullName}.csv &
-                    ./sampleCPU.sh ./samplecpu/$codec/${encodeFullName} &
+                    ./sampleCPU.sh ./samplecpu/$codec/${encodeFullName} ffmpeg &
                 fi
                 if [[ $encodeFFMPEG == "true" ]]; then
-                    ffmpeg  -s $resolution -y -r $fps -pix_fmt yuv420p10le -i ./input/${filename}.yuv -c:v libx264  -preset ${preset}  -crf ${crf}  $encodeFullPath
+                    ffmpeg  -s $resolution -y -r $fps -pix_fmt yuv420p10le -i ./input/${filename}.yuv -c:v libx264  -preset ${presetFFMPEG}  -crf ${crf}  $encodeFullPath
                 fi
                 killProcesses
 
                 export FFREPORT=file=./ffmpeg/$codec/$decodeFullName.log:level=32
                 if [[ $powerProfile == "true" ]]; then
                     ./intelgadget ./csv/$codec/${decodeFullName}.csv &
-                    ./sampleCPU.sh ./samplecpu/$codec/${decodeFullName} &
+                    ./sampleCPU.sh ./samplecpu/$codec/${decodeFullName} ffmpeg &
                 fi
                 if [[ $decodeFFMPEG == "true" ]]; then
                     ffmpeg -i $encodeFullPath -y $decodeFullPath
@@ -251,17 +251,17 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
                 export FFREPORT=file=./ffmpeg/$codec/$encodeFullName.log:level=32
                 if [[ $powerProfile == "true" ]]; then
                     ./intelgadget ./csv/$codec/${encodeFullName}.csv &
-                    ./sampleCPU.sh ./samplecpu/$codec/${encodeFullName} &
+                    ./sampleCPU.sh ./samplecpu/$codec/${encodeFullName} ffmpeg &
                 fi
                 if [[ $encodeFFMPEG == "true" ]]; then
-                    ffmpeg  -s $resolution -y -r $fps -pix_fmt yuv420p10le -i ./input/${filename}.yuv -c:v libx265  -preset ${preset}  -crf ${crf}  $encodeFullPath
+                    ffmpeg  -s $resolution -y -r $fps -pix_fmt yuv420p10le -i ./input/${filename}.yuv -c:v libx265  -preset ${presetFFMPEG}  -crf ${crf}  $encodeFullPath
                 fi
                 killProcesses
 
                 export FFREPORT=file=./ffmpeg/$codec/$decodeFullName.log:level=32
                 if [[ $powerProfile == "true" ]]; then
                     ./intelgadget ./csv/$codec/${decodeFullName}.csv &
-                    ./sampleCPU.sh ./samplecpu/$codec/${decodeFullName} &
+                    ./sampleCPU.sh ./samplecpu/$codec/${decodeFullName} ffmpeg &
                 fi
                 if [[ $decodeFFMPEG == "true" ]]; then
                     ffmpeg -i $encodeFullPath -y $decodeFullPath
@@ -297,7 +297,7 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
                 export FFREPORT=file=./ffmpeg/$codec/$encodeFullName.log:level=32
                 if [[ $powerProfile == "true" ]]; then
                     ./intelgadget ./csv/$codec/${encodeFullName}.csv &
-                    ./sampleCPU.sh ./samplecpu/$codec/${encodeFullName} &
+                    ./sampleCPU.sh ./samplecpu/$codec/${encodeFullName} ffmpeg &
                 fi
                 if [[ $encodeFFMPEG == "true" ]]; then
                     ffmpeg  -s $resolution -y -r $fps -pix_fmt yuv420p10le -i ./input/${filename}.yuv -c:v libvpx-vp9 -row-mt 1 -crf ${crf} -b:v 0 $encodeFullPath
@@ -307,7 +307,7 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
                 export FFREPORT=file=./ffmpeg/$codec/$decodeFullName.log:level=32
                 if [[ $powerProfile == "true" ]]; then
                     ./intelgadget ./csv/$codec/${decodeFullName}.csv &
-                    ./sampleCPU.sh ./samplecpu/$codec/${decodeFullName} &
+                    ./sampleCPU.sh ./samplecpu/$codec/${decodeFullName} ffmpeg &
                 fi
                 if [[ $decodeFFMPEG == "true" ]]; then
                     ffmpeg -i $encodeFullPath -y $decodeFullPath
@@ -329,7 +329,89 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
         # AV1 encoding / decoding
         # ffmpeg -i input.mp4 -c:v libaom-av1 -crf 30 -b:v 0 av1_test.mkv
         if [[ ${CODECs[@]} =~ "av1" ]]; then
-            echo "Do nothing for now."
+
+            codec="av1"
+            for crf in "${CRFs[@]}"; do
+                encodeFullName="${filename}_encoded_crf_${crf}_${iteration}"
+                videoEncodeName="${filename}_encoded_crf_${crf}"
+                encodeFullPath="./encoded/$codec/"$videoEncodeName".mp4"
+                
+                decodeFullName="${filename}_decoded_crf_${crf}_${iteration}"
+                videoDecodeName="${filename}_decoded_crf_${crf}"
+                decodeFullPath="./decoded/$codec/"$videoDecodeName".yuv"
+
+                export FFREPORT=file=./ffmpeg/$codec/$encodeFullName.log:level=32
+                if [[ $powerProfile == "true" ]]; then
+                    ./intelgadget ./csv/$codec/${encodeFullName}.csv &
+                    ./sampleCPU.sh ./samplecpu/$codec/${encodeFullName} ffmpeg &
+                fi
+                if [[ $encodeFFMPEG == "true" ]]; then
+                    ffmpeg  -s $resolution -y -r $fps -pix_fmt yuv420p10le -i ./input/${filename}.yuv -row-mt 1 -tiles 2x2 -strict -2 -c:v libaom-av1 -crf ${crf} -b:v 0 $encodeFullPath
+                fi
+                killProcesses
+
+                export FFREPORT=file=./ffmpeg/$codec/$decodeFullName.log:level=32
+                if [[ $powerProfile == "true" ]]; then
+                    ./intelgadget ./csv/$codec/${decodeFullName}.csv &
+                    ./sampleCPU.sh ./samplecpu/$codec/${decodeFullName} ffmpeg &
+                fi
+                if [[ $decodeFFMPEG == "true" ]]; then
+                    ffmpeg -i $encodeFullPath -y $decodeFullPath
+                fi
+                killProcesses
+
+                # ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi libvmaf="model_path=vmaf_v0.6.1.pkl":log_path=vmaf_logfile.txt -f null –
+                PSNR_SSIM_filename="${filename}_crf_${crf}"
+                if [[ $enableMetrics == "true" ]] && [[ $iteration == $RUN_ITERATIONS ]]; then
+                    ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi psnr=stats_file=./psnr/$codec/${PSNR_SSIM_filename}.txt -f null –
+                    ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi ssim=stats_file=./ssim/$codec/${PSNR_SSIM_filename}.txt -f null -
+                fi
+
+            done
+        fi
+
+        # VVC encoding / decoding
+        # ./vvencapp -s 1920x1080 -r 60 -c yuv420_10 -i ./input/S12CatRobot1_1920x1080_60fps_10bit_420.yuv --preset faster  -q 51 -o test.yuv
+        if [[ ${CODECs[@]} =~ "vvc" ]]; then
+
+            codec="vvc"
+            for crf in "${CRFs[@]}"; do
+                encodeFullName="${filename}_encoded_crf_${crf}_${iteration}"
+                videoEncodeName="${filename}_encoded_crf_${crf}"
+                encodeFullPath="./encoded/$codec/"$videoEncodeName".266"
+                
+                decodeFullName="${filename}_decoded_crf_${crf}_${iteration}"
+                videoDecodeName="${filename}_decoded_crf_${crf}"
+                decodeFullPath="./decoded/$codec/"$videoDecodeName".yuv"
+
+                export FFREPORT=file=./ffmpeg/$codec/$encodeFullName.log:level=32
+                if [[ $powerProfile == "true" ]]; then
+                    ./intelgadget ./csv/$codec/${encodeFullName}.csv &
+                    ./sampleCPU.sh ./samplecpu/$codec/${encodeFullName} ffmpeg &
+                fi
+                if [[ $encodeFFMPEG == "true" ]]; then
+                    ./vvencapp -s $resolution -r $fps -c yuv420_10 -i ./input/${filename}.yuv --preset ${presetVVC}  -q ${crf} -o $encodeFullPath
+                fi
+                killProcesses
+
+                export FFREPORT=file=./ffmpeg/$codec/$decodeFullName.log:level=32
+                if [[ $powerProfile == "true" ]]; then
+                    ./intelgadget ./csv/$codec/${decodeFullName}.csv &
+                    ./sampleCPU.sh ./samplecpu/$codec/${decodeFullName} ffmpeg &
+                fi
+                if [[ $decodeFFMPEG == "true" ]]; then
+                    ./vvdecapp -b $encodeFullPath -o $decodeFullPath
+                fi
+                killProcesses
+
+                # ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi libvmaf="model_path=vmaf_v0.6.1.pkl":log_path=vmaf_logfile.txt -f null –
+                PSNR_SSIM_filename="${filename}_crf_${crf}"
+                if [[ $enableMetrics == "true" ]] && [[ $iteration == $RUN_ITERATIONS ]]; then
+                    ffmpeg -i $decodeFullPath -i ./input/${filename}.yuv -lavfi psnr=stats_file=./psnr/$codec/${PSNR_SSIM_filename}.txt -f null –
+                    ffmpeg -i $decodeFullPath -i ./input/${filename}.yuv -lavfi ssim=stats_file=./ssim/$codec/${PSNR_SSIM_filename}.txt -f null -
+                fi
+
+            done
         fi
     done
 done

@@ -8,9 +8,17 @@
 /psnr
 
 /input/*
+/vvdec
+/vvenc
+vvencapp
+vvdecapp
 
 intelgadget
 .vscode
 .DS_Store
 *.asv
 opsnr.stt
+
+settings.old.cfg
+test.266
+testdec.yuv
