@@ -38,14 +38,9 @@ function deletePrevious () {
         rm -r $rootpath/ffmpeg
     fi
 
-    if [[ ! -z $(ls -l $rootpath/psnr/) ]]; then
+    if [[ ! -z $(ls -l $rootpath/metrics/) ]]; then
         echo "PSNR folder not empty - remove all files and directories"
-        rm -r $rootpath/psnr
-    fi
-
-    if [[ ! -z $(ls -l $rootpath/ssim/) ]]; then
-        echo "SSIM folder not empty - remove all files and directories"
-        rm -r $rootpath/ssim
+        rm -r $rootpath/metrics
     fi
 
     if [[ ! -z $(ls -l $rootpath/idle) ]]; then
@@ -63,8 +58,7 @@ function createNewFolderStructure () {
         mkdir -p ./csv/${codec}
         mkdir -p ./samplecpu/${codec}
         mkdir -p ./ffmpeg/${codec}
-        mkdir -p ./psnr/${codec}
-        mkdir -p ./ssim/${codec}
+        mkdir -p ./metrics/${codec}
         mkdir -p ./idle
     done
 }
@@ -93,7 +87,7 @@ function killProcesses () {
         kill -15 $pid
     fi
 
-    sleep 10
+    sleep $delay
 }
 
 function runIdle () {
@@ -180,16 +174,19 @@ fi
 # Run the Power Profiling for each codec
 for iteration in $(seq 1 $RUN_ITERATIONS); do 
 
-    for fullname in ./input/*.mp4; do
+    for fullname in ./input/*.yuv; do
 
         name=${fullname##*/}
-        filename=${name%.mp4}
+        filename=${name%.yuv}
         echo "Run the process for: "$filename
         resolution=$(echo $filename | awk '{ split($0,ar,"_"); print ar[2]}')
+        width=$(echo $resolution | awk '{ split($0,ar,"x"); print ar[1]}')
+        height=$(echo $resolution | awk '{ split($0,ar,"x"); print ar[2]}')
+
         fps=$(echo $filename | awk '{ split($0,ar,"_"); print ar[3]}')
         fps=${fps%???}
 
-        ffmpeg -i ./input/$filename.mp4 -n ./input/$filename.yuv
+        # ffmpeg -i ./input/$filename.mp4 -n ./input/$filename.yuv
     
         # H264 encoding / decoding
         if [[ ${CODECs[@]} =~ "h264" ]]; then
@@ -198,7 +195,7 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
             for crf in "${CRFs[@]}"; do
                 encodeFullName="${filename}_encoded_crf_${crf}_${iteration}"
                 videoEncodeName="${filename}_encoded_crf_${crf}"
-                encodeFullPath="./encoded/$codec/"$videoEncodeName".mp4"
+                encodeFullPath="./encoded/$codec/"$videoEncodeName".yuv"
                 
                 decodeFullName="${filename}_decoded_crf_${crf}_${iteration}"
                 videoDecodeName="${filename}_decoded_crf_${crf}"
@@ -227,13 +224,22 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
                 # ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi libvmaf="model_path=vmaf_v0.6.1.pkl":log_path=vmaf_logfile.txt -f null –
                 PSNR_SSIM_filename="${filename}_crf_${crf}"
                 if [[ $enableMetrics == "true" ]] && [[ $iteration == $RUN_ITERATIONS ]]; then
-                    ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi psnr=stats_file=./psnr/$codec/${PSNR_SSIM_filename}.txt -f null –
-                    ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi ssim=stats_file=./ssim/$codec/${PSNR_SSIM_filename}.txt -f null -
+                    if [[ $width == "3840" ]]; then
+                        vmafModel="vmaf_4k_v0.6.1"
+                    else
+                        vmafModel="vmaf_v0.6.1"
+                    fi
+                    
+                    # ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi psnr=stats_file=./psnr/$codec/${PSNR_SSIM_filename}.txt -f null –
+                    # ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi ssim=stats_file=./ssim/$codec/${PSNR_SSIM_filename}.txt -f null -
+                    ./vmafrun --reference ./input/${filename}.yuv --distorted ${decodeFullPath} --width $width --height $height --pixel_format 420 --bitdepth 10 --feature psnr --feature float_ssim --feature float_ms_ssim --threads 18 --model version=${vmafModel} --csv --output ./metrics/${codec}/${PSNR_SSIM_filename}.csv
+                    
+                    rm ./decoded/${codec}/*
                 fi
             done
         fi
 
-        sleep 10
+        sleep $delay
 
         # H265 encoding / decoding
         if [[ ${CODECs[@]} =~ "h265" ]]; then
@@ -271,14 +277,23 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
                 # ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi libvmaf="model_path=vmaf_v0.6.1.pkl":log_path=vmaf_logfile.txt -f null –
                 PSNR_SSIM_filename="${filename}_crf_${crf}"
                 if [[ $enableMetrics == "true" ]] && [[ $iteration == $RUN_ITERATIONS ]]; then
-                    ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi psnr=stats_file=./psnr/$codec/${PSNR_SSIM_filename}.txt -f null –
-                    ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi ssim=stats_file=./ssim/$codec/${PSNR_SSIM_filename}.txt -f null -
+                    if [[ $width == "3840" ]]; then
+                        vmafModel="vmaf_4k_v0.6.1"
+                    else
+                        vmafModel="vmaf_v0.6.1"
+                    fi
+                    
+                    # ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi psnr=stats_file=./psnr/$codec/${PSNR_SSIM_filename}.txt -f null –
+                    # ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi ssim=stats_file=./ssim/$codec/${PSNR_SSIM_filename}.txt -f null -
+                    ./vmafrun --reference ./input/${filename}.yuv --distorted ${decodeFullPath} --width $width --height $height --pixel_format 420 --bitdepth 10 --feature psnr --feature float_ssim --feature float_ms_ssim --threads 18 --model version=${vmafModel} --csv --output ./metrics/${codec}/${PSNR_SSIM_filename}.csv
+                    
+                    rm ./decoded/${codec}/*
                 fi
 
             done
         fi
 
-        sleep 10
+        sleep $delay
 
         # VP9 encoding / decoding
         # ffmpeg -s 1920x1080 -r 60 -pix_fmt yuv420p10le -i ./input/S11AirAcrobatic_1920x1080_60fps_10bit_420.yuv -c:v libvpx-vp9 -crf 55 -b:v 0 -row-mt 1 encoded_vp9.yuv
@@ -317,14 +332,23 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
                 # ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi libvmaf="model_path=vmaf_v0.6.1.pkl":log_path=vmaf_logfile.txt -f null –
                 PSNR_SSIM_filename="${filename}_crf_${crf}"
                 if [[ $enableMetrics == "true" ]] && [[ $iteration == $RUN_ITERATIONS ]]; then
-                    ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi psnr=stats_file=./psnr/$codec/${PSNR_SSIM_filename}.txt -f null –
-                    ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi ssim=stats_file=./ssim/$codec/${PSNR_SSIM_filename}.txt -f null -
+                    if [[ $width == "3840" ]]; then
+                        vmafModel="vmaf_4k_v0.6.1"
+                    else
+                        vmafModel="vmaf_v0.6.1"
+                    fi
+                    
+                    # ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi psnr=stats_file=./psnr/$codec/${PSNR_SSIM_filename}.txt -f null –
+                    # ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi ssim=stats_file=./ssim/$codec/${PSNR_SSIM_filename}.txt -f null -
+                    ./vmafrun --reference ./input/${filename}.yuv --distorted ${decodeFullPath} --width $width --height $height --pixel_format 420 --bitdepth 10 --feature psnr --feature float_ssim --feature float_ms_ssim --threads 18 --model version=${vmafModel} --csv --output ./metrics/${codec}/${PSNR_SSIM_filename}.csv
+                    
+                    rm ./decoded/${codec}/*
                 fi
 
             done
         fi
         
-        sleep 10
+        sleep $delay
         
         # AV1 encoding / decoding
         # ffmpeg -i input.mp4 -c:v libaom-av1 -crf 30 -b:v 0 av1_test.mkv
@@ -334,7 +358,7 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
             for crf in "${CRFs[@]}"; do
                 encodeFullName="${filename}_encoded_crf_${crf}_${iteration}"
                 videoEncodeName="${filename}_encoded_crf_${crf}"
-                encodeFullPath="./encoded/$codec/"$videoEncodeName".mp4"
+                encodeFullPath="./encoded/$codec/"$videoEncodeName".yuv"
                 
                 decodeFullName="${filename}_decoded_crf_${crf}_${iteration}"
                 videoDecodeName="${filename}_decoded_crf_${crf}"
@@ -363,8 +387,17 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
                 # ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi libvmaf="model_path=vmaf_v0.6.1.pkl":log_path=vmaf_logfile.txt -f null –
                 PSNR_SSIM_filename="${filename}_crf_${crf}"
                 if [[ $enableMetrics == "true" ]] && [[ $iteration == $RUN_ITERATIONS ]]; then
-                    ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi psnr=stats_file=./psnr/$codec/${PSNR_SSIM_filename}.txt -f null –
-                    ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi ssim=stats_file=./ssim/$codec/${PSNR_SSIM_filename}.txt -f null -
+                    if [[ $width == "3840" ]]; then
+                        vmafModel="vmaf_4k_v0.6.1"
+                    else
+                        vmafModel="vmaf_v0.6.1"
+                    fi
+                    
+                    # ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi psnr=stats_file=./psnr/$codec/${PSNR_SSIM_filename}.txt -f null –
+                    # ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi ssim=stats_file=./ssim/$codec/${PSNR_SSIM_filename}.txt -f null -
+                    ./vmafrun --reference ./input/${filename}.yuv --distorted ${decodeFullPath} --width $width --height $height --pixel_format 420 --bitdepth 10 --feature psnr --feature float_ssim --feature float_ms_ssim --threads 18 --model version=${vmafModel} --csv --output ./metrics/${codec}/${PSNR_SSIM_filename}.csv
+                    
+                    rm ./decoded/${codec}/*
                 fi
 
             done
@@ -390,7 +423,7 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
                     ./sampleCPU.sh ./samplecpu/$codec/${encodeFullName} ffmpeg &
                 fi
                 if [[ $encodeFFMPEG == "true" ]]; then
-                    ./vvencapp -s $resolution -r $fps -c yuv420_10 -i ./input/${filename}.yuv --preset ${presetVVC}  -q ${crf} -o $encodeFullPath
+                    ./vvencapp -s $resolution -r $fps -c yuv420_10 -i ./input/${filename}.yuv --preset ${presetVVC}  -q ${crf} -o $encodeFullPath | tee ./ffmpeg/$codec/$encodeFullName.log
                 fi
                 killProcesses
 
@@ -400,15 +433,24 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
                     ./sampleCPU.sh ./samplecpu/$codec/${decodeFullName} ffmpeg &
                 fi
                 if [[ $decodeFFMPEG == "true" ]]; then
-                    ./vvdecapp -b $encodeFullPath -o $decodeFullPath
+                    ./vvdecapp -b $encodeFullPath -o $decodeFullPath | tee ./ffmpeg/$codec/$decodeFullName.log
                 fi
                 killProcesses
 
                 # ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi libvmaf="model_path=vmaf_v0.6.1.pkl":log_path=vmaf_logfile.txt -f null –
                 PSNR_SSIM_filename="${filename}_crf_${crf}"
                 if [[ $enableMetrics == "true" ]] && [[ $iteration == $RUN_ITERATIONS ]]; then
-                    ffmpeg -i $decodeFullPath -i ./input/${filename}.yuv -lavfi psnr=stats_file=./psnr/$codec/${PSNR_SSIM_filename}.txt -f null –
-                    ffmpeg -i $decodeFullPath -i ./input/${filename}.yuv -lavfi ssim=stats_file=./ssim/$codec/${PSNR_SSIM_filename}.txt -f null -
+                    if [[ $width == "3840" ]]; then
+                        vmafModel="vmaf_4k_v0.6.1"
+                    else
+                        vmafModel="vmaf_v0.6.1"
+                    fi
+                    
+                    # ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi psnr=stats_file=./psnr/$codec/${PSNR_SSIM_filename}.txt -f null –
+                    # ffmpeg -i $encodeFullPath -i ./input/${filename}.mp4 -lavfi ssim=stats_file=./ssim/$codec/${PSNR_SSIM_filename}.txt -f null -
+                    ./vmafrun --reference ./input/${filename}.yuv --distorted ${decodeFullPath} --width $width --height $height --pixel_format 420 --bitdepth 10 --feature psnr --feature float_ssim --feature float_ms_ssim --threads 18 --model version=${vmafModel} --csv --output ./metrics/${codec}/${PSNR_SSIM_filename}.csv
+                    
+                    rm ./decoded/${codec}/*
                 fi
 
             done

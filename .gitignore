@@ -4,14 +4,15 @@
 /idle
 /samplecpu
 /csv
-/ssim
-/psnr
+/metrics
 
 /input/*
 /vvdec
 /vvenc
+/vmaf
 vvencapp
 vvdecapp
+vmafrun
 
 intelgadget
 .vscode
@@ -19,6 +20,5 @@ intelgadget
 *.asv
 opsnr.stt
 
+/inputToBe
 settings.old.cfg
-test.266
-testdec.yuv
