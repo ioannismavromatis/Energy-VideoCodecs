@@ -182,6 +182,8 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
         resolution=$(echo $filename | awk '{ split($0,ar,"_"); print ar[2]}')
         width=$(echo $resolution | awk '{ split($0,ar,"x"); print ar[1]}')
         height=$(echo $resolution | awk '{ split($0,ar,"x"); print ar[2]}')
+        frames=$(echo $filename | awk '{ split($0,ar,"_"); print ar[6]}')
+        frames=${frames%??????}
 
         fps=$(echo $filename | awk '{ split($0,ar,"_"); print ar[3]}')
         fps=${fps%???}
@@ -192,7 +194,7 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
         if [[ ${CODECs[@]} =~ "h264" ]]; then
             
             codec="h264"
-            for crf in "${CRFs[@]}"; do
+            for crf in "${CRFsInit[@]}"; do
                 encodeFullName="${filename}_encoded_crf_${crf}_${iteration}"
                 videoEncodeName="${filename}_encoded_crf_${crf}"
                 encodeFullPath="./encoded/$codec/"$videoEncodeName".yuv"
@@ -245,7 +247,7 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
         if [[ ${CODECs[@]} =~ "h265" ]]; then
 
             codec="h265"
-            for crf in "${CRFs[@]}"; do
+            for crf in "${CRFsInit[@]}"; do
                 encodeFullName="${filename}_encoded_crf_${crf}_${iteration}"
                 videoEncodeName="${filename}_encoded_crf_${crf}"
                 encodeFullPath="./encoded/$codec/"$videoEncodeName".mp4"
@@ -300,7 +302,7 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
         if [[ ${CODECs[@]} =~ "vp9" ]]; then
 
             codec="vp9"
-            for crf in "${CRFs[@]}"; do
+            for crf in "${CRFsMapped[@]}"; do
                 encodeFullName="${filename}_encoded_crf_${crf}_${iteration}"
                 videoEncodeName="${filename}_encoded_crf_${crf}"
                 encodeFullPath="./encoded/$codec/"$videoEncodeName".mp4"
@@ -351,36 +353,36 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
         sleep $delay
         
         # AV1 encoding / decoding
-        # ffmpeg -i input.mp4 -c:v libaom-av1 -crf 30 -b:v 0 av1_test.mkv
+        # ./SvtAv1EncApp -i ./input/D1BasketballPass_416x240_50fps_10bit_420.yuv --fps 50 --input-depth 10 --qp 63  -w 832 -h 480 -n 1550 -b test.ivf
         if [[ ${CODECs[@]} =~ "av1" ]]; then
 
             codec="av1"
-            for crf in "${CRFs[@]}"; do
+            for crf in "${CRFsMapped[@]}"; do
                 encodeFullName="${filename}_encoded_crf_${crf}_${iteration}"
                 videoEncodeName="${filename}_encoded_crf_${crf}"
-                encodeFullPath="./encoded/$codec/"$videoEncodeName".yuv"
+                encodeFullPath="./encoded/$codec/"$videoEncodeName".ivf"
                 
                 decodeFullName="${filename}_decoded_crf_${crf}_${iteration}"
                 videoDecodeName="${filename}_decoded_crf_${crf}"
                 decodeFullPath="./decoded/$codec/"$videoDecodeName".yuv"
 
-                export FFREPORT=file=./ffmpeg/$codec/$encodeFullName.log:level=32
                 if [[ $powerProfile == "true" ]]; then
                     ./intelgadget ./csv/$codec/${encodeFullName}.csv &
-                    ./sampleCPU.sh ./samplecpu/$codec/${encodeFullName} ffmpeg &
+                    ./sampleCPU.sh ./samplecpu/$codec/${encodeFullName} SvtAv1EncApp &
                 fi
                 if [[ $encodeFFMPEG == "true" ]]; then
-                    ffmpeg  -s $resolution -y -r $fps -pix_fmt yuv420p10le -i ./input/${filename}.yuv -row-mt 1 -tiles 2x2 -strict -2 -c:v libaom-av1 -crf ${crf} -b:v 0 $encodeFullPath
+                    # ffmpeg  -s $resolution -y -r $fps -pix_fmt yuv420p10le -i ./input/${filename}.yuv -row-mt 1 -tiles 2x2 -strict -2 -c:v libaom-av1 -crf ${crf} -b:v 0 $encodeFullPath
+                    ./SvtAv1EncApp -i ./input/${filename}.yuv --fps $fps --input-depth 10 --qp ${crf}  -w $width -h $height -n $frames --preset $presetAVI1 --enable-stat-report 1 --stat-file ./ffmpeg/$codec/$encodeFullName.log -b $encodeFullPath
                 fi
                 killProcesses
 
-                export FFREPORT=file=./ffmpeg/$codec/$decodeFullName.log:level=32
                 if [[ $powerProfile == "true" ]]; then
                     ./intelgadget ./csv/$codec/${decodeFullName}.csv &
-                    ./sampleCPU.sh ./samplecpu/$codec/${decodeFullName} ffmpeg &
+                    ./sampleCPU.sh ./samplecpu/$codec/${decodeFullName} SvtAv1DecApp &
                 fi
                 if [[ $decodeFFMPEG == "true" ]]; then
-                    ffmpeg -i $encodeFullPath -y $decodeFullPath
+                    # ffmpeg -i $encodeFullPath -y $decodeFullPath
+                    ./SvtAv1DecApp -i $encodeFullPath -o $decodeFullPath -bit-depth 10 -w $width -h $height -colour-space 420 -fps-frm -fps-summary
                 fi
                 killProcesses
 
@@ -408,7 +410,7 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
         if [[ ${CODECs[@]} =~ "vvc" ]]; then
 
             codec="vvc"
-            for crf in "${CRFs[@]}"; do
+            for crf in "${CRFsInit[@]}"; do
                 encodeFullName="${filename}_encoded_crf_${crf}_${iteration}"
                 videoEncodeName="${filename}_encoded_crf_${crf}"
                 encodeFullPath="./encoded/$codec/"$videoEncodeName".266"
@@ -417,20 +419,18 @@ for iteration in $(seq 1 $RUN_ITERATIONS); do
                 videoDecodeName="${filename}_decoded_crf_${crf}"
                 decodeFullPath="./decoded/$codec/"$videoDecodeName".yuv"
 
-                export FFREPORT=file=./ffmpeg/$codec/$encodeFullName.log:level=32
                 if [[ $powerProfile == "true" ]]; then
                     ./intelgadget ./csv/$codec/${encodeFullName}.csv &
-                    ./sampleCPU.sh ./samplecpu/$codec/${encodeFullName} ffmpeg &
+                    ./sampleCPU.sh ./samplecpu/$codec/${encodeFullName} vvencapp &
                 fi
                 if [[ $encodeFFMPEG == "true" ]]; then
                     ./vvencapp -s $resolution -r $fps -c yuv420_10 -i ./input/${filename}.yuv --preset ${presetVVC}  -q ${crf} -o $encodeFullPath | tee ./ffmpeg/$codec/$encodeFullName.log
                 fi
                 killProcesses
 
-                export FFREPORT=file=./ffmpeg/$codec/$decodeFullName.log:level=32
                 if [[ $powerProfile == "true" ]]; then
                     ./intelgadget ./csv/$codec/${decodeFullName}.csv &
-                    ./sampleCPU.sh ./samplecpu/$codec/${decodeFullName} ffmpeg &
+                    ./sampleCPU.sh ./samplecpu/$codec/${decodeFullName} vvdecapp &
                 fi
                 if [[ $decodeFFMPEG == "true" ]]; then
                     ./vvdecapp -b $encodeFullPath -o $decodeFullPath | tee ./ffmpeg/$codec/$decodeFullName.log

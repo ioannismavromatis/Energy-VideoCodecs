@@ -10,9 +10,12 @@
 /vvdec
 /vvenc
 /vmaf
+/SVT-AV1
 vvencapp
 vvdecapp
 vmafrun
+SvtAv1DecApp
+SvtAv1EncApp
 
 intelgadget
 .vscode
@@ -21,4 +24,3 @@ intelgadget
 opsnr.stt
 
 /inputToBe
-settings.old.cfg
