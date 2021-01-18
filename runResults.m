@@ -15,15 +15,21 @@ fprintf('email: \n');
 fprintf('email: \n\n');
 
 
+load('nullArray.mat')
+nullArray = encodedArray2;
+
 inputFolder = "./input/*.yuv";
 
-CODECs =[ "h264" "h265" "vvc"];
-CRFs = [ 22 27 32 37 42 ];
+CODECs =[ "h264" "h265" "vvc" "vp9" "av1" ]; 
+CRFsInit = [ 22 27 32 37 42 ];
+CRFsMapped= [ 27 33 40 46 52 ];
+CRFsCodecMapping = [ 0 0 0 1 1 ];
+
 iterations = 3;
 idle_iterations = 10;
 
 marker = [ 'o' '+' '*' 's' 'd'];
-lineStyle = [ '-' '--' ':' '-.' ];
+lineStyle = [ '-' '--' ':' '-.' '-' ];
 
 col=@(x)reshape(x,numel(x),1);
 boxplot2=@(C,varargin)boxplot(cell2mat(cellfun(col,col(C),'uni',0)),cell2mat(arrayfun(@(I)I*ones(numel(C{I}),1),col(1:numel(C)),'uni',0)),varargin{:});
@@ -66,64 +72,91 @@ ylabel('Watt (DRAM)')
 set(gca,'FontSize', 18)
 
 
-[ names, fps, bit, chroma, baseName, resolutionecodedencoded , NoFrames] = getFileNames(inputFolder);
+[ names, fps, bit, chroma, baseName, resolution, NoFrames] = getFileNames(inputFolder);
+
 
 for name = 1:length(names)
-    for crf = 1:length(CRFs)
+    for crf = 1:length(CRFsInit)
         for codec = 1:length(CODECs)
             for iteration = 1:iterations
-                % Encoded Power profile
-                path = [ './csv/' CODECs(codec) '/' names(name) '_encoded_crf_' CRFs(crf) '_' iteration '.csv' ];
-                path = strjoin(path,'')
-               % encoded = importCSV(path);
-                encoded = importCSV_RAPL(path);
-                encodedArray = table2array(encoded);
                 
-                avgWattsEncIA(iteration,codec,crf) = str2double(encodedArray(end,13))/str2double(encodedArray(end,3));
-                cumWattsEncIA(iteration,codec,crf) = str2double(encodedArray(end,13));
-                dataEncIA{iteration,codec,crf} = str2double(encodedArray(:,12));
+                if ~CRFsCodecMapping(codec)
+                    eval('CRFtoRead = CRFsInit')
+                else
+                    eval('CRFtoRead = CRFsMapped')
+                end
+                
+                % Encoded Power profile
+                path = [ './csv/' CODECs(codec) '/' names(name) '_encoded_crf_' CRFtoRead(crf) '_' iteration '.csv' ];
+                path = strjoin(path,'');
+               % encoded = importCSV(path);
+               
+                try
+                    encoded = importCSV_RAPL(path);
+                    encodedArray = table2array(encoded);
+                catch
+                    encodedArray = nullArray;
+                end
+                    
+                
+                avgWattsEncIA(iteration,codec,crf) = str2double(encodedArray(end,10))/str2double(encodedArray(end,3));
+                cumWattsEncIA(iteration,codec,crf) = str2double(encodedArray(end,10));
+                dataEncIA{iteration,codec,crf} = str2double(encodedArray(:,9));
                 avgWattsEncDRAM(iteration,codec,crf) = str2double(encodedArray(end,20))/str2double(encodedArray(end,3));
                 cumWattsEncDRAM(iteration,codec,crf) = str2double(encodedArray(end,20));
                 dataEncDRAM{iteration,codec,crf} = str2double(encodedArray(:,19));
                 
                 % Decoded Power profile
-%                 path = [ './csv/' CODECs(codec) '/' names(name) '_decoded_crf_' CRFs(crf) '_' iteration '.csv' ];
-%                 path = strjoin(path,'');
-%                 decoded = importCSV(path);
-%                 decodedArray = table2array(decoded);
-%                 
-%                 avgWattsDecIA(iteration,codec,crf) = str2double(decodedArray(end,13))/str2double(decodedArray(end,3));
-%                 cumWattsDecIA(iteration,codec,crf) = str2double(decodedArray(end,13));
-%                 dataDecIA{iteration,codec,crf} = str2double(decodedArray(:,12));
-%                 avgWattsDecDRAM(iteration,codec,crf) = str2double(decodedArray(end,20))/str2double(decodedArray(end,3));
-%                 cumWattsDecDRAM(iteration,codec,crf) = str2double(decodedArray(end,20));
-%                 dataDecDRAM{iteration,codec,crf} = str2double(decodedArray(:,19));
+                path = [ './csv/' CODECs(codec) '/' names(name) '_decoded_crf_' CRFtoRead(crf) '_' iteration '.csv' ];
+                path = strjoin(path,'');
+                
+                try
+                    decoded = importCSV_RAPL(path);
+                    decodedArray = table2array(decoded);
+                catch
+                    decodedArray = nullArray;
+                end
+                
+                avgWattsDecIA(iteration,codec,crf) = str2double(decodedArray(end,10))/str2double(decodedArray(end,3));
+                cumWattsDecIA(iteration,codec,crf) = str2double(decodedArray(end,10));
+                dataDecIA{iteration,codec,crf} = str2double(decodedArray(:,9));
+                avgWattsDecDRAM(iteration,codec,crf) = str2double(decodedArray(end,20))/str2double(decodedArray(end,3));
+                cumWattsDecDRAM(iteration,codec,crf) = str2double(decodedArray(end,20));
+                dataDecDRAM{iteration,codec,crf} = str2double(decodedArray(:,19));
                  
 %                 % CPU utilisation - encoder
-%                 path = [ './samplecpu/' CODECs(codec) '/' names(name) '_encoded_crf_' CRFs(crf) '_' iteration '.log' ];
+%                 path = [ './samplecpu/' CODECs(codec) '/' names(name) '_encoded_crf_' CRFtoRead(crf) '_' iteration '.log' ];
 %                 path = strjoin(path,'');
 %                 dataCPUEnc{iteration,codec,crf} = importCPUUtilisation(path);
 %                       
 %                 % CPU utilisation - decoder
-%                 path = [ './samplecpu/' CODECs(codec) '/' names(name) '_decoded_crf_' CRFs(crf) '_' iteration '.log' ];
+%                 path = [ './samplecpu/' CODECs(codec) '/' names(name) '_decoded_crf_' CRFtoRead(crf) '_' iteration '.log' ];
 %                 path = strjoin(path,'');
 %                 dataCPUDec{iteration,codec,crf} = importCPUUtilisation(path);
             end
             
-            path = [ './psnr/' CODECs(codec) '/' names(name) '_crf_' CRFs(crf) '.txt' ];
+            path = [ './metrics/' CODECs(codec) '/' names(name) '_crf_' CRFtoRead(crf) '.csv' ];
             path = strjoin(path,'');
-            metricsQuality = readQualityMetrics(path);            
-            dataPSNR{codec,crf} = metricsQuality.psnrY;
-            dataSSIM{codec,crf} = metricsQuality.SSIM;        
-            dataVMAF{codec,crf} = metricsQuality.VMAF;
+            
+            try 
+                metricsQuality = readQualityMetrics(path);  
+                dataPSNR{codec,crf} = metricsQuality.psnrY;
+                dataSSIM{codec,crf} = metricsQuality.SSIM;        
+                dataVMAF{codec,crf} = metricsQuality.VMAF;
+            catch
+                dataPSNR{codec,crf} = 0;
+                dataSSIM{codec,crf} = 0;        
+                dataVMAF{codec,crf} = 0;                
+            end
+
 
 
             % Path to encoded video
-            path = [ './encoded/' CODECs(codec) '/' names(name) '_encoded_crf_' CRFs(crf) '.mp4' ];
+            path = [ './encoded/' CODECs(codec) '/' names(name) '_encoded_crf_' CRFtoRead(crf) '.*' ];
             path = strjoin(path,'');
             
             s = dir(path);
-            bitrate(codec,crf) = s.bytes * 8 * fps(name) / NoFrames(name)/1024;
+            bitrate(codec,crf) = s.bytes * 8 * fps(name) / NoFrames(name)/1024; % Value to kbps
             
             averageCumEncIA = 0;
             for iteration = 1:iterations
@@ -165,13 +198,14 @@ for name = 1:length(names)
     results(name).cumWattsDecDRAM = cumWattsDecDRAM;
     results(name).dataDecDRAM = dataDecDRAM;
     
-    results(name).dataCPUEnc = dataCPUEnc;
-    results(name).dataCPUDec = dataCPUDec;
+%     results(name).dataCPUEnc = dataCPUEnc;
+%     results(name).dataCPUDec = dataCPUDec;
     
     metrics(name).dataPSNR = dataPSNR;
     metrics(name).dataSSIM = dataSSIM;
 end
 
+metrics
 
 % for name = 1:length(names)
 %     %     Decoding CPU utilisation and Power
@@ -309,77 +343,85 @@ end
 % end
 
 for name = 1:length(names)
-    for i = 1:length(CRFs)
-        txt(i) = string([num2str(CRFs(i)) ' \rightarrow' ]);
+    
+    if ~CRFsCodecMapping(codec)
+        eval('CRFtoRead = CRFsInit')
+    else
+        eval('CRFtoRead = CRFsMapped')
+    end
+    
+    
+    for i = 1:length(CRFsInit)
+        txt(i) = string([num2str(CRFsInit(i)) ' \rightarrow' ]);
     end
     
     figure('units','normalized','outerposition',[0 0 1 1])
     
     subplot(3,2,1)
     for codec = 1:length(CODECs)
-        for crf = 1:length(CRFs)
+        for crf = 1:length(CRFsInit)
             avgPSNR(crf) = mean(metrics(name).dataPSNR{codec,crf});
         end
         plot(results(name).averageCumEncOverall(codec,:),avgPSNR, 'Marker',marker(codec),'MarkerSize',11,'LineStyle',lineStyle(codec), 'LineWidth',2)
         text(results(name).averageCumEncOverall(codec,:),avgPSNR,txt,'FontSize',14,'HorizontalAlignment','right')
         hold on
     end
-    title(['Avg. Cumulative Energy - PSNR - CRFs \{' num2str(CRFs) '\}'])
+    title(['Avg. Cumulative Energy - PSNR - CRFs \{' num2str(CRFsInit) '\}'])
     xlabel('Avg. Cumulative Energy (Joule)')
     ylabel('PSNR (dB)')
     set(gca,'FontSize', 18)
     grid on;
-    legend(CODECs{1},CODECs{2},CODECs{3})
+    legend(CODECs{1},CODECs{2},CODECs{3},CODECs{4},CODECs{5})
 
     
     
     subplot(3,2,2)
     for codec = 1:length(CODECs)
-        for crf = 1:length(CRFs)
+        for crf = 1:length(CRFsInit)
             avgSSIM(crf) = mean(metrics(name).dataSSIM{codec,crf});
         end
         plot(results(name).averageCumEncOverall(codec,:),avgSSIM, 'Marker',marker(codec),'MarkerSize',11,'LineStyle',lineStyle(codec), 'LineWidth',2)
         text(results(name).averageCumEncOverall(codec,:),avgSSIM,txt,'FontSize',14,'HorizontalAlignment','right')
         hold on
     end
-    title(['Avg. Cumulative Energy - SSIM - CRFs \{' num2str(CRFs) '\}'])
+    title(['Avg. Cumulative Energy - SSIM - CRFs \{' num2str(CRFsInit) '\}'])
     xlabel('Avg. Cumulative Energy (Joule)')
     ylabel('Norm.')
     set(gca,'FontSize', 18)
     grid on;
-    legend(CODECs{1},CODECs{2},CODECs{3})
+    legend(CODECs{1},CODECs{2},CODECs{3},CODECs{4},CODECs{5})
     
     subplot(3,2,3)
     for codec = 1:length(CODECs)
-        for crf = 1:length(CRFs)
+        for crf = 1:length(CRFsInit)
             avgPSNR(crf) = mean(metrics(name).dataPSNR{codec,crf});
         end
         plot(results(name).bitrate(codec,:),avgPSNR, 'Marker',marker(codec),'MarkerSize',11,'LineStyle',lineStyle(codec), 'LineWidth',2)
         text(results(name).bitrate(codec,:),avgPSNR,txt,'FontSize',14,'HorizontalAlignment','right')
         hold on
     end
-    title(['Bitrate - PSNR - CRFs \{' num2str(CRFs) '\}'])
+    title(['Bitrate - PSNR - CRFs \{' num2str(CRFsInit) '\}'])
     xlabel('Bitrate (kbits per frame)')
     ylabel('PSNR (dB)')
     set(gca,'FontSize', 18)
     grid on;
-    legend(CODECs{1},CODECs{2},CODECs{3})
+    legend(CODECs{1},CODECs{2},CODECs{3},CODECs{4},CODECs{5})
     
     subplot(3,2,4)
     for codec = 1:length(CODECs)
-        for crf = 1:length(CRFs)
+        for crf = 1:length(CRFsInit)
             avgSSIM(crf) = mean(metrics(name).dataSSIM{codec,crf});
         end
         plot(results(name).bitrate(codec,:),avgSSIM, 'Marker',marker(codec),'MarkerSize',11,'LineStyle',lineStyle(codec), 'LineWidth',2)
         text(results(name).bitrate(codec,:),avgSSIM,txt,'FontSize',14,'HorizontalAlignment','right')
         hold on
     end
-    title(['Bitrate - SSIM - CRFs \{' num2str(CRFs) '\}'])
+    title(['Bitrate - SSIM - CRFs \{' num2str(CRFsInit) '\}'])
     xlabel('Bitrate (kbits per frame)')
     ylabel('Norm.')
     set(gca,'FontSize', 18)
     grid on;
-    legend(CODECs{1},CODECs{2},CODECs{3})
+    legend(CODECs{1},CODECs{2},CODECs{3},CODECs{4},CODECs{5})
     
     subplot(3,2,5)
     for codec = 1:length(CODECs)
@@ -387,10 +429,10 @@ for name = 1:length(names)
         text(results(name).averageCumEncOverall(codec,:),results(name).bitrate(codec,:),txt,'FontSize',14,'HorizontalAlignment','right')
         hold on
     end
-    title(['Bitrate - SSIM - CRFs \{' num2str(CRFs) '\}'])
+    title(['Bitrate - SSIM - CRFs \{' num2str(CRFsInit) '\}'])
     xlabel('Avg. Cumulative Energy (Joule)')
     ylabel('Bitrate (kbits per frame)')
     set(gca,'FontSize', 18)
     grid on;
-    legend(CODECs{1},CODECs{2},CODECs{3})
+    legend(CODECs{1},CODECs{2},CODECs{3},CODECs{4},CODECs{5})
 end
