@@ -1,4 +1,4 @@
-function [ name, fps, bit, chroma, baseName, resolution ] = getFileNames(inputFolder)
+function [ name, fps, bit, chroma, baseName, resolution, NoFrames ] = getFileNames(inputFolder)
 %GETFILENAMES Parse all input video file names and
 % return them to the main function.
 %  Input  :
@@ -33,6 +33,9 @@ function [ name, fps, bit, chroma, baseName, resolution ] = getFileNames(inputFo
         
         baseName(i) = string(str(1));
         resolution(i) = string(str(2));
+        
+        B = regexp(str(6),'\d*','Match');
+        NoFrames(i) = getNum(B);
     end
 end
 

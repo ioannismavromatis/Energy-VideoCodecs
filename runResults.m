@@ -15,11 +15,11 @@ fprintf('email: \n');
 fprintf('email: \n\n');
 
 
-inputFolder = "./input/*.mp4";
+inputFolder = "./input/*.yuv";
 
-CODECs =[ "h264" "h265" "vp9" ];
-CRFs = [ 15 35 51 ];
-iterations = 4;
+CODECs =[ "h264" "h265" "vvc"];
+CRFs = [ 22 27 32 37 42 ];
+iterations = 3;
 idle_iterations = 10;
 
 marker = [ 'o' '+' '*' 's' 'd'];
@@ -66,7 +66,7 @@ ylabel('Watt (DRAM)')
 set(gca,'FontSize', 18)
 
 
-[ names, fps, bit, chroma, baseName, resolution ] = getFileNames(inputFolder);
+[ names, fps, bit, chroma, baseName, resolutionecodedencoded , NoFrames] = getFileNames(inputFolder);
 
 for name = 1:length(names)
     for crf = 1:length(CRFs)
@@ -74,8 +74,9 @@ for name = 1:length(names)
             for iteration = 1:iterations
                 % Encoded Power profile
                 path = [ './csv/' CODECs(codec) '/' names(name) '_encoded_crf_' CRFs(crf) '_' iteration '.csv' ];
-                path = strjoin(path,'');
-                encoded = importCSV(path);
+                path = strjoin(path,'')
+               % encoded = importCSV(path);
+                encoded = importCSV_RAPL(path);
                 encodedArray = table2array(encoded);
                 
                 avgWattsEncIA(iteration,codec,crf) = str2double(encodedArray(end,13))/str2double(encodedArray(end,3));
@@ -86,49 +87,43 @@ for name = 1:length(names)
                 dataEncDRAM{iteration,codec,crf} = str2double(encodedArray(:,19));
                 
                 % Decoded Power profile
-                path = [ './csv/' CODECs(codec) '/' names(name) '_decoded_crf_' CRFs(crf) '_' iteration '.csv' ];
-                path = strjoin(path,'');
-                decoded = importCSV(path);
-                decodedArray = table2array(decoded);
-                
-                avgWattsDecIA(iteration,codec,crf) = str2double(decodedArray(end,13))/str2double(decodedArray(end,3));
-                cumWattsDecIA(iteration,codec,crf) = str2double(decodedArray(end,13));
-                dataDecIA{iteration,codec,crf} = str2double(decodedArray(:,12));
-                avgWattsDecDRAM(iteration,codec,crf) = str2double(decodedArray(end,20))/str2double(decodedArray(end,3));
-                cumWattsDecDRAM(iteration,codec,crf) = str2double(decodedArray(end,20));
-                dataDecDRAM{iteration,codec,crf} = str2double(decodedArray(:,19));
-                
-                % CPU utilisation - encoder
-                path = [ './samplecpu/' CODECs(codec) '/' names(name) '_encoded_crf_' CRFs(crf) '_' iteration '.log' ];
-                path = strjoin(path,'');
-                dataCPUEnc{iteration,codec,crf} = importCPUUtilisation(path);
-                      
-                % CPU utilisation - decoder
-                path = [ './samplecpu/' CODECs(codec) '/' names(name) '_decoded_crf_' CRFs(crf) '_' iteration '.log' ];
-                path = strjoin(path,'');
-                dataCPUDec{iteration,codec,crf} = importCPUUtilisation(path);
+%                 path = [ './csv/' CODECs(codec) '/' names(name) '_decoded_crf_' CRFs(crf) '_' iteration '.csv' ];
+%                 path = strjoin(path,'');
+%                 decoded = importCSV(path);
+%                 decodedArray = table2array(decoded);
+%                 
+%                 avgWattsDecIA(iteration,codec,crf) = str2double(decodedArray(end,13))/str2double(decodedArray(end,3));
+%                 cumWattsDecIA(iteration,codec,crf) = str2double(decodedArray(end,13));
+%                 dataDecIA{iteration,codec,crf} = str2double(decodedArray(:,12));
+%                 avgWattsDecDRAM(iteration,codec,crf) = str2double(decodedArray(end,20))/str2double(decodedArray(end,3));
+%                 cumWattsDecDRAM(iteration,codec,crf) = str2double(decodedArray(end,20));
+%                 dataDecDRAM{iteration,codec,crf} = str2double(decodedArray(:,19));
+                 
+%                 % CPU utilisation - encoder
+%                 path = [ './samplecpu/' CODECs(codec) '/' names(name) '_encoded_crf_' CRFs(crf) '_' iteration '.log' ];
+%                 path = strjoin(path,'');
+%                 dataCPUEnc{iteration,codec,crf} = importCPUUtilisation(path);
+%                       
+%                 % CPU utilisation - decoder
+%                 path = [ './samplecpu/' CODECs(codec) '/' names(name) '_decoded_crf_' CRFs(crf) '_' iteration '.log' ];
+%                 path = strjoin(path,'');
+%                 dataCPUDec{iteration,codec,crf} = importCPUUtilisation(path);
             end
             
             path = [ './psnr/' CODECs(codec) '/' names(name) '_crf_' CRFs(crf) '.txt' ];
             path = strjoin(path,'');
-            allPSNR = importPSNR(path);
-            allPSNRArray = table2array(allPSNR);
-            
-            dataPSNR{codec,crf} = allPSNRArray(:,6);
-            
-            path = [ './ssim/' CODECs(codec) '/' names(name) '_crf_' CRFs(crf) '.txt' ];
-            path = strjoin(path,'');
-            allSSIM = importSSIM(path);
-            allSSIMArray = table2array(allSSIM);
-            
-            dataSSIM{codec,crf} = allSSIMArray(:,5);
-            
+            metricsQuality = readQualityMetrics(path);            
+            dataPSNR{codec,crf} = metricsQuality.psnrY;
+            dataSSIM{codec,crf} = metricsQuality.SSIM;        
+            dataVMAF{codec,crf} = metricsQuality.VMAF;
+
+
             % Path to encoded video
             path = [ './encoded/' CODECs(codec) '/' names(name) '_encoded_crf_' CRFs(crf) '.mp4' ];
             path = strjoin(path,'');
             
             s = dir(path);
-            bitrate(codec,crf) = s.bytes * 8 * fps(name) / 300/1000;
+            bitrate(codec,crf) = s.bytes * 8 * fps(name) / NoFrames(name)/1024;
             
             averageCumEncIA = 0;
             for iteration = 1:iterations
@@ -152,6 +147,7 @@ for name = 1:length(names)
     results(name).resolution = resolution(name);
     results(name).bit = bit(name);
     results(name).chroma = chroma(name);
+    results(name).NoFrames = NoFrames(name);
     results(name).bitrate = bitrate;
     
     results(name).avgWattsEncIA = avgWattsEncIA;
